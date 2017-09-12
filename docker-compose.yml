@@ -1,4 +1,4 @@
-version: "2"
+version: "3"
 services:
   zookeeper:
     image: wurstmeister/zookeeper:latest
@@ -18,7 +18,7 @@ services:
         KAFKA_ADVERTISED_HOST_NAME: kafka
         KAFKA_ADVERTISED_PORT: "9092"
         KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_CREATE_TOPICS: "dockertest:1:1"
+        KAFKA_CREATE_TOPICS: "dockertest:3:1"
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
   tokenserver:
@@ -31,21 +31,57 @@ services:
       depends_on:
         - zookeeper
         - kafka
-  producer:
+  producer1:
         image: producer
-        hostname: producer
-        container_name: producer
+        hostname: producer1
+        container_name: producer1
         tty: true
         depends_on:
           - zookeeper
           - kafka
           - tokenserver
-  consumer:
-          image: consumer
-          hostname: consumer
-          container_name: consumer
+  producer2:
+          image: producer
+          hostname: producer2
+          container_name: producer2
           tty: true
           depends_on:
             - zookeeper
             - kafka
             - tokenserver
+  producer3:
+            image: producer
+            hostname: producer3
+            container_name: producer3
+            tty: true
+            depends_on:
+              - zookeeper
+              - kafka
+              - tokenserver
+  consumer1:
+          image: consumer
+          hostname: consumer1
+          container_name: consumer1
+          tty: true
+          depends_on:
+            - zookeeper
+            - kafka
+            - tokenserver
+  consumer2:
+            image: consumer
+            hostname: consumer2
+            container_name: consumer2
+            tty: true
+            depends_on:
+              - zookeeper
+              - kafka
+              - tokenserver
+  consumer3:
+              image: consumer
+              hostname: consumer3
+              container_name: consumer3
+              tty: true
+              depends_on:
+                - zookeeper
+                - kafka
+                - tokenserver
