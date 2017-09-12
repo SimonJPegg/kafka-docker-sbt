@@ -8,6 +8,10 @@ scalafmtConfig in ThisBuild := file("scalafmt.conf")
 scalafmtVersion in ThisBuild := "1.1.0"
 scalafmtOnCompile := true
 
+val tokenServerDebugPort = 5001
+val producerDebugPort = 5002
+val consumerDebugPort = 5003
+
 def dockerSettings(exposePort: Option[Int] = None,
                    debugPort: Option[Int] = None) = Seq(
   assemblyMergeStrategy in assembly := {
@@ -21,7 +25,7 @@ def dockerSettings(exposePort: Option[Int] = None,
     val baseDir = baseDirectory.value
     val artifact: File = assembly.value
     val artifactTargetPath = s"/app/${artifact.name}"
-    val dockerResourcesDir = baseDir / "docker-scripts"
+    val dockerResourcesDir = baseDir / "src/main/resources/docker-scripts"
     val dockerResourcesTargetPath = "/app/"
 
     new Dockerfile {
@@ -64,7 +68,8 @@ lazy val `tokenserver` = (project in file("tokenserver"))
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
-    dockerSettings(exposePort = Some(8888)),
+    dockerSettings(exposePort = Some(8888),
+                   debugPort = Some(tokenServerDebugPort)),
     mainClass in assembly := Some("com.kainos.token.TokenServer")
   )
 
@@ -80,7 +85,7 @@ lazy val `producer` = (project in file("producer"))
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
-    dockerSettings(),
+    dockerSettings(debugPort = Some(producerDebugPort)),
     mainClass in assembly := Some("com.kainos.client.Producer")
   )
   .dependsOn(`tokenserver`)
@@ -97,6 +102,6 @@ lazy val `consumer` = (project in file("consumer"))
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
-    dockerSettings(),
+    dockerSettings(debugPort = Some(consumerDebugPort)),
     mainClass in assembly := Some("com.kainos.client.Consumer")
   )
