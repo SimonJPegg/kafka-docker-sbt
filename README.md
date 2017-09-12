@@ -9,3 +9,6 @@ Run:
 sbt clean docker
 docker-compose up
 ```
+Should generate **two** Kafka messages and wait. Shutdown the containers with `Ctrl-C`.
+
+ 
