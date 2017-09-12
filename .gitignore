@@ -1,0 +1,14 @@
+### Intellij ###
+# User-specific stuff:
+.idea
+*.iws
+/out/
+.idea_modules/
+*.ipr
+*.DS_Store
+._*
+dist/*
+target/
+lib_managed/
+.cache
+.lib/
