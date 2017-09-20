@@ -21,15 +21,8 @@ fi
 if [ -n "$DOCKER_IMAGES" ]; then
     printf "Docker Images: \n%s\n\n" "$DOCKER_IMAGES"
 
-    docker rmi $DOCKER_IMAGES
+    docker rmi -f $DOCKER_IMAGES
     printf "Deleted all Docker images.\n"
 else
     printf "There were no Docker images to delete.\n"
 fi
-
-# Deletes the cached dependencies for each of the node applications, ignoring .gitignore files.
-for directory in $NODE_CACHED_DEPENDENCIES
-do
-    printf "Deleting contents of directory: %s\n" "$directory"
-    find $directory ! -name '.gitignore' ! -path $directory -delete
-done

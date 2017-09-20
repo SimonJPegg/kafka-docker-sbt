@@ -1,0 +1,9 @@
+{
+   "type": "record",
+   "name": "TokenMessage",
+   "namespace": "com.kainos.schema",
+   "fields": [
+     {"name": "pan", "type": "string"},
+     {"name": "token", "type": "string"}
+   ]
+ }

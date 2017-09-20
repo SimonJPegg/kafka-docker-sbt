@@ -1,13 +1,13 @@
 version: "3"
 services:
   zookeeper:
-    image: wurstmeister/zookeeper:latest
+    image: confluent/zookeeper:latest
     hostname: zookeeper
     container_name: zookeeper
     ports:
       - "2181:2181"
   kafka:
-      image: wurstmeister/kafka:0.10.0.0
+      image: confluent/kafka:latest
       hostname: kafka
       container_name: kafka
       ports:
@@ -18,9 +18,36 @@ services:
         KAFKA_ADVERTISED_HOST_NAME: kafka
         KAFKA_ADVERTISED_PORT: "9092"
         KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_CREATE_TOPICS: "dockertest:3:1"
+        KAFKA_BROKER_ID: 1
+        KAFKA_auto_create_topics_enable: "true"
+        KAFKA_num_partitions: 1
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+  schemaregistry:
+      image: confluent/schema-registry
+      hostname: schemaregistry
+      container_name: schemaregistry
+      depends_on:
+        - kafka
+        - zookeeper
+      ports:
+        - "8081:8081"
+      environment:
+        SR_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
+        SR_KAFKASTORE_TOPIC: "_schemas"
+  restproxy:
+      image: confluent/rest-proxy
+      hostname: restproxy
+      container_name: restproxy
+      depends_on:
+        - zookeeper
+        - kafka
+        - schemaregistry
+      ports:
+        - "8082:8082"
+      environment:
+        RP_ZOOKEEPER_CONNECT: "zookeeper:2181"
+        RP_SCHEMA_REGISTRY_URL: "http://schemaregistry:8081"
   tokenserver:
       image: tokenserver
       hostname: tokenserver
@@ -40,24 +67,24 @@ services:
           - zookeeper
           - kafka
           - tokenserver
-  producer2:
-          image: producer
-          hostname: producer2
-          container_name: producer2
-          tty: true
-          depends_on:
-            - zookeeper
-            - kafka
-            - tokenserver
-  producer3:
-            image: producer
-            hostname: producer3
-            container_name: producer3
-            tty: true
-            depends_on:
-              - zookeeper
-              - kafka
-              - tokenserver
+#  producer2:
+#          image: producer
+#          hostname: producer2
+#          container_name: producer2
+#          tty: true
+#          depends_on:
+#            - zookeeper
+#            - kafka
+#            - tokenserver
+#  producer3:
+#            image: producer
+#            hostname: producer3
+#            container_name: producer3
+#            tty: true
+#            depends_on:
+#              - zookeeper
+#              - kafka
+#              - tokenserver
   consumer1:
           image: consumer
           hostname: consumer1
@@ -67,21 +94,21 @@ services:
             - zookeeper
             - kafka
             - tokenserver
-  consumer2:
-            image: consumer
-            hostname: consumer2
-            container_name: consumer2
-            tty: true
-            depends_on:
-              - zookeeper
-              - kafka
-              - tokenserver
-  consumer3:
-              image: consumer
-              hostname: consumer3
-              container_name: consumer3
-              tty: true
-              depends_on:
-                - zookeeper
-                - kafka
-                - tokenserver
+#  consumer2:
+#            image: consumer
+#            hostname: consumer2
+#            container_name: consumer2
+#            tty: true
+#            depends_on:
+#              - zookeeper
+#              - kafka
+#              - tokenserver
+#  consumer3:
+#            image: consumer
+#            hostname: consumer3
+#            container_name: consumer3
+#            tty: true
+#            depends_on:
+#              - zookeeper
+#              - kafka
+#              - tokenserver
