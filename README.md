@@ -7,8 +7,14 @@ Run:
 
 ```
 sbt clean docker
-docker-compose up
+docker-compose
 ```
-Should generate a random number Kafka messages (printing them to a console) and wait. Shutdown the containers with `Ctrl-C` once new messages stop appearing.
+
+or 
+```$xslt
+sbt clean dockerComposeUp
+```
+
+Should generate lines from Shakespeare's plays along with the year the were written.
 
  
