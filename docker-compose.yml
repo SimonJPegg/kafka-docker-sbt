@@ -1,15 +1,13 @@
 version: "3"
 services:
   zookeeper:
-    image: wurstmeister/zookeeper:latest
+    image: confluent/zookeeper:latest
     hostname: zookeeper
-    container_name: zookeeper
     ports:
       - "2181:2181"
   kafka:
-      image: wurstmeister/kafka:0.10.0.0
+      image: confluent/kafka:latest
       hostname: kafka
-      container_name: kafka
       ports:
         - "9092:9092"
       depends_on:
@@ -18,70 +16,42 @@ services:
         KAFKA_ADVERTISED_HOST_NAME: kafka
         KAFKA_ADVERTISED_PORT: "9092"
         KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_CREATE_TOPICS: "dockertest:3:1"
+        KAFKA_BROKER_ID: 1
+        KAFKA_auto_create_topics_enable: "true"
+        KAFKA_num_partitions: 1
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-  tokenserver:
-      image: tokenserver
-      hostname: tokenserver
-      container_name: tokenserver
-      tty: true
-      ports:
-        - "8888:8888"
+  schemaregistry:
+      image: confluent/schema-registry
+      hostname: schemaregistry
       depends_on:
-        - zookeeper
         - kafka
-  producer1:
-        image: producer
-        hostname: producer1
-        container_name: producer1
+        - zookeeper
+      ports:
+        - "8081:8081"
+      environment:
+        SR_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
+        SR_KAFKASTORE_TOPIC: "_schemas"
+  string_producer:
+        image: string_producer
+        hostname: string_producer
         tty: true
         depends_on:
           - zookeeper
           - kafka
-          - tokenserver
-  producer2:
-          image: producer
-          hostname: producer2
-          container_name: producer2
+  string_avro_converter:
+          image: string_avro_converter
+          hostname: string_avro_converter
           tty: true
           depends_on:
             - zookeeper
             - kafka
-            - tokenserver
-  producer3:
-            image: producer
-            hostname: producer3
-            container_name: producer3
-            tty: true
-            depends_on:
-              - zookeeper
-              - kafka
-              - tokenserver
-  consumer1:
-          image: consumer
-          hostname: consumer1
-          container_name: consumer1
+            - schemaregistry
+  avro_consumer:
+          image: avro_consumer
+          hostname: avro_consumer
           tty: true
           depends_on:
             - zookeeper
             - kafka
-            - tokenserver
-  consumer2:
-            image: consumer
-            hostname: consumer2
-            container_name: consumer2
-            tty: true
-            depends_on:
-              - zookeeper
-              - kafka
-              - tokenserver
-  consumer3:
-              image: consumer
-              hostname: consumer3
-              container_name: consumer3
-              tty: true
-              depends_on:
-                - zookeeper
-                - kafka
-                - tokenserver
+            - schemaregistry
