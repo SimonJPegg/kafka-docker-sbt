@@ -14,7 +14,11 @@ lazy val tokenServerDebugPort = 5001
 lazy val producerDebugPort = 5002
 lazy val consumerDebugPort = 5003
 
-def dockerSettings(exposePort: List[Int] = Nil, debugPort: Option[Int] = None) =
+def dockerSettings(
+    exposePort: List[Int] = Nil,
+    debugPort: Option[Int] = None,
+    copyFiles: Option[List[(String, String)]] = None
+) =
   Seq(
     assemblyMergeStrategy in assembly := {
       case r if r.startsWith("reference.conf") => MergeStrategy.concat
@@ -33,6 +37,11 @@ def dockerSettings(exposePort: List[Int] = Nil, debugPort: Option[Int] = None) =
       new Dockerfile {
         from("java")
         add(artifact, artifactTargetPath)
+        copyFiles.map {
+          _.map { fileTuple =>
+            copy(baseDir / fileTuple._1, fileTuple._2)
+          }
+        }
         copy(dockerResourcesDir, dockerResourcesTargetPath)
         entryPoint(s"/app/entrypoint.sh")
         debugPort match {
@@ -54,73 +63,87 @@ def dockerSettings(exposePort: List[Int] = Nil, debugPort: Option[Int] = None) =
   )
 
 lazy val `kafka-docker-sbt` = (project in file("."))
-  .aggregate(`producer`, `tokenserver`, `consumer`)
+  .aggregate(`string_producer`, `string_avro_converter`, `avro_consumer`)
 
 lazy val `schema` = (project in file("schema"))
   .enablePlugins(SbtAvro)
   .settings(
     scalaVersion := scalaProjectVersion,
-    name := "tokenserver",
+    name := "schema",
     version := projectVersion,
     stringType := "CharSequence",
+    resolvers += "Confluent" at "http://packages.confluent.io/maven/",
     libraryDependencies ++= Seq(
       "com.sksamuel.avro4s" %% "avro4s-core" % "1.8.0",
-      "com.squareup.okhttp3" % "okhttp" % "3.9.0"
+      "org.apache.kafka" % "kafka-clients" % "0.10.2.0-cp1"
     )
   )
 
-lazy val `tokenserver` = (project in file("tokenserver"))
+lazy val `string_producer` = (project in file("stringProducer"))
   .enablePlugins(sbtdocker.DockerPlugin)
   .settings(
     scalaVersion := scalaProjectVersion,
-    name := "tokenserver",
-    version := projectVersion,
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.9",
-      "org.scalatest" %% "scalatest" % "3.0.1" % "test"
-    ),
-    wartremoverWarnings ++= Warts.all,
-    scalafmtOnCompile := true,
-    dockerSettings(exposePort = List(8888),
-                   debugPort = Some(tokenServerDebugPort)),
-    mainClass in assembly := Some("com.kainos.token.TokenServer")
-  )
-
-lazy val `producer` = (project in file("producer"))
-  .enablePlugins(sbtdocker.DockerPlugin)
-  .settings(
-    scalaVersion := scalaProjectVersion,
-    name := "producer",
+    name := "string_producer",
     version := projectVersion,
     resolvers += "Confluent" at "http://packages.confluent.io/maven/",
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "org.apache.avro" % "avro" % "1.8.1",
       "io.confluent" % "kafka-avro-serializer" % "3.2.1",
-      "org.apache.kafka" % "kafka-clients" % "0.10.2.0"
+      "org.apache.kafka" % "kafka-clients" % "0.10.2.0-cp1"
+    ),
+    wartremoverWarnings ++= Warts.all,
+    scalafmtOnCompile := true,
+    dockerSettings(
+      debugPort = Some(producerDebugPort),
+      copyFiles = Some(
+        List(
+          (
+            "src/main/resources/data/shakespeare",
+            "/data/shakespeare"
+          )))
+    ),
+    mainClass in assembly := Some("com.kainos.producer.StringProducer")
+  )
+  .dependsOn(`schema`)
+
+lazy val `string_avro_converter` = (project in file("stringAvroConverter"))
+  .enablePlugins(sbtdocker.DockerPlugin)
+  .settings(
+    scalaVersion := scalaProjectVersion,
+    name := "string_avro_converter",
+    version := projectVersion,
+    resolvers += "Confluent" at "http://packages.confluent.io/maven/",
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "org.apache.avro" % "avro" % "1.8.1",
+      "io.confluent" % "kafka-avro-serializer" % "3.2.1",
+      "org.apache.kafka" % "kafka-clients" % "0.10.2.0-cp1"
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
     dockerSettings(debugPort = Some(producerDebugPort)),
-    mainClass in assembly := Some("com.kainos.client.Producer")
+    mainClass in assembly := Some(
+      "com.kainos.converter.StringConsumerAvroProducer")
   )
-  .dependsOn(`tokenserver`, `schema`)
+  .dependsOn(`schema`)
 
-lazy val `consumer` = (project in file("consumer"))
+lazy val `avro_consumer` = (project in file("avroConsumer"))
   .enablePlugins(sbtdocker.DockerPlugin)
   .settings(
     scalaVersion := scalaProjectVersion,
-    name := "consumer",
+    name := "avro_consumer",
     version := projectVersion,
+    resolvers += "Confluent" at "http://packages.confluent.io/maven/",
     libraryDependencies ++= Seq(
       "org.apache.avro" % "avro" % "1.8.1",
       "io.confluent" % "kafka-avro-serializer" % "3.2.1",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-      "org.apache.kafka" % "kafka-clients" % "0.10.2.0"
+      "org.apache.kafka" % "kafka-clients" % "0.10.2.0-cp1"
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
     dockerSettings(debugPort = Some(consumerDebugPort)),
-    mainClass in assembly := Some("com.kainos.client.Consumer")
+    mainClass in assembly := Some("com.kainos.consumer.AvroConsumer")
   )
   .dependsOn(`schema`)

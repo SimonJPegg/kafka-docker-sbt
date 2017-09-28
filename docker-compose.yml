@@ -35,80 +35,29 @@ services:
       environment:
         SR_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
         SR_KAFKASTORE_TOPIC: "_schemas"
-  restproxy:
-      image: confluent/rest-proxy
-      hostname: restproxy
-      container_name: restproxy
-      depends_on:
-        - zookeeper
-        - kafka
-        - schemaregistry
-      ports:
-        - "8082:8082"
-      environment:
-        RP_ZOOKEEPER_CONNECT: "zookeeper:2181"
-        RP_SCHEMA_REGISTRY_URL: "http://schemaregistry:8081"
-  tokenserver:
-      image: tokenserver
-      hostname: tokenserver
-      container_name: tokenserver
-      tty: true
-      ports:
-        - "8888:8888"
-      depends_on:
-        - zookeeper
-        - kafka
-  producer1:
-        image: producer
-        hostname: producer1
-        container_name: producer1
+  string_producer:
+        image: string_producer
+        hostname: string_producer
+        container_name: string_producer
         tty: true
         depends_on:
           - zookeeper
           - kafka
-          - tokenserver
-#  producer2:
-#          image: producer
-#          hostname: producer2
-#          container_name: producer2
-#          tty: true
-#          depends_on:
-#            - zookeeper
-#            - kafka
-#            - tokenserver
-#  producer3:
-#            image: producer
-#            hostname: producer3
-#            container_name: producer3
-#            tty: true
-#            depends_on:
-#              - zookeeper
-#              - kafka
-#              - tokenserver
-  consumer1:
-          image: consumer
-          hostname: consumer1
-          container_name: consumer1
+  string_avro_converter:
+          image: string_avro_converter
+          hostname: string_avro_converter
+          container_name: string_avro_converter
           tty: true
           depends_on:
             - zookeeper
             - kafka
-            - tokenserver
-#  consumer2:
-#            image: consumer
-#            hostname: consumer2
-#            container_name: consumer2
-#            tty: true
-#            depends_on:
-#              - zookeeper
-#              - kafka
-#              - tokenserver
-#  consumer3:
-#            image: consumer
-#            hostname: consumer3
-#            container_name: consumer3
-#            tty: true
-#            depends_on:
-#              - zookeeper
-#              - kafka
-#              - tokenserver
+            - schemaregistry
+  avro_consumer:
+          image: avro_consumer
+          hostname: avro_consumer
+          container_name: avro_consumer
+          tty: true
+          depends_on:
+            - zookeeper
+            - kafka
+            - schemaregistry
