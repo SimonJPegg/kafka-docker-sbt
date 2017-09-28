@@ -10,57 +10,25 @@ scalafmtConfig in ThisBuild := file("scalafmt.conf")
 scalafmtVersion in ThisBuild := "1.1.0"
 scalafmtOnCompile := true
 
-lazy val tokenServerDebugPort = 5001
 lazy val producerDebugPort = 5002
+lazy val converterDebugPort = 5001
 lazy val consumerDebugPort = 5003
 
-def dockerSettings(
-    exposePort: List[Int] = Nil,
-    debugPort: Option[Int] = None,
-    copyFiles: Option[List[(String, String)]] = None
-) =
-  Seq(
-    assemblyMergeStrategy in assembly := {
-      case r if r.startsWith("reference.conf") => MergeStrategy.concat
-      case PathList("META-INF", m) if m.equalsIgnoreCase("MANIFEST.MF") =>
-        MergeStrategy.discard
-      case _ => MergeStrategy.first
-    },
-    dockerfile in docker := {
-      // The assembly task generates a fat JAR file
-      val baseDir = baseDirectory.value
-      val artifact: File = assembly.value
-      val artifactTargetPath = s"/app/${artifact.name}"
-      val dockerResourcesDir = baseDir / "src/main/resources/docker-scripts"
-      val dockerResourcesTargetPath = "/app/"
+lazy val dockerAppPath = "/app/"
+lazy val dockerResourcesDir = "src/main/resources/docker-scripts"
+lazy val dockerResourcesTargetPath = "/app/"
 
-      new Dockerfile {
-        from("java")
-        add(artifact, artifactTargetPath)
-        copyFiles.map {
-          _.map { fileTuple =>
-            copy(baseDir / fileTuple._1, fileTuple._2)
-          }
-        }
-        copy(dockerResourcesDir, dockerResourcesTargetPath)
-        entryPoint(s"/app/entrypoint.sh")
-        debugPort match {
-          case Some(port) =>
-            cmd(s"${name.value}", s"${version.value}", s"$port")
-          case None => cmd(s"${name.value}", s"${version.value}")
-        }
-        exposePort map (expose(_))
-      }
-    },
-    imageNames in docker := Seq(
-      // Sets the latest tag
-      ImageName(s"${name.value}:latest"),
-      // Sets a name with a tag that contains the project version
-      ImageName(namespace = Some(organization.value),
-                repository = name.value,
-                tag = Some("v" + version.value))
-    )
-  )
+enablePlugins(DockerComposePlugin)
+
+docker <<= (
+  docker in `string_producer`,
+  docker in `string_avro_converter`,
+  docker in `avro_consumer`
+) map { (image, _, _) =>
+  image
+}
+
+dockerImageCreationTask := docker.value
 
 lazy val `kafka-docker-sbt` = (project in file("."))
   .aggregate(`string_producer`, `string_avro_converter`, `avro_consumer`)
@@ -80,7 +48,7 @@ lazy val `schema` = (project in file("schema"))
   )
 
 lazy val `string_producer` = (project in file("stringProducer"))
-  .enablePlugins(sbtdocker.DockerPlugin)
+  .enablePlugins(sbtdocker.DockerPlugin, DockerComposePlugin, JavaAppPackaging)
   .settings(
     scalaVersion := scalaProjectVersion,
     name := "string_producer",
@@ -94,21 +62,33 @@ lazy val `string_producer` = (project in file("stringProducer"))
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
-    dockerSettings(
-      debugPort = Some(producerDebugPort),
-      copyFiles = Some(
-        List(
-          (
-            "src/main/resources/data/shakespeare",
-            "/data/shakespeare"
-          )))
-    ),
-    mainClass in assembly := Some("com.kainos.producer.StringProducer")
+    dockerImageCreationTask := (publishLocal in Docker).value,
+    mainClass in Compile := Some("com.kainos.producer.StringProducer"),
+    dockerfile in docker := {
+      new Dockerfile {
+        val mainClassString = (mainClass in Compile).value.get
+        val classpath = (fullClasspath in Compile).value
+        from("java")
+        add(classpath.files, dockerAppPath)
+        copy(baseDirectory.value / dockerResourcesDir,
+             dockerResourcesTargetPath)
+        copy(baseDirectory.value / "src/main/resources/data/shakespeare",
+             "/data/shakespeare")
+        entryPoint(s"/app/entrypoint.sh")
+        cmd(s"${name.value}", s"${version.value}", s"$producerDebugPort")
+      }
+    },
+    imageNames in docker := Seq(
+      ImageName(s"${name.value}:latest"),
+      ImageName(namespace = Some(organization.value),
+                repository = name.value,
+                tag = Some("v" + version.value))
+    )
   )
   .dependsOn(`schema`)
 
 lazy val `string_avro_converter` = (project in file("stringAvroConverter"))
-  .enablePlugins(sbtdocker.DockerPlugin)
+  .enablePlugins(sbtdocker.DockerPlugin, DockerComposePlugin, JavaAppPackaging)
   .settings(
     scalaVersion := scalaProjectVersion,
     name := "string_avro_converter",
@@ -122,14 +102,32 @@ lazy val `string_avro_converter` = (project in file("stringAvroConverter"))
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
-    dockerSettings(debugPort = Some(producerDebugPort)),
-    mainClass in assembly := Some(
-      "com.kainos.converter.StringConsumerAvroProducer")
+    dockerImageCreationTask := (publishLocal in Docker).value,
+    mainClass in Compile := Some(
+      "com.kainos.converter.StringConsumerAvroProducer"),
+    dockerfile in docker := {
+      new Dockerfile {
+        val mainClassString = (mainClass in Compile).value.get
+        val classpath = (fullClasspath in Compile).value
+        from("java")
+        add(classpath.files, dockerAppPath)
+        copy(baseDirectory.value / dockerResourcesDir,
+             dockerResourcesTargetPath)
+        entryPoint(s"/app/entrypoint.sh")
+        cmd(s"${name.value}", s"${version.value}", s"$converterDebugPort")
+      }
+    },
+    imageNames in docker := Seq(
+      ImageName(s"${name.value}:latest"),
+      ImageName(namespace = Some(organization.value),
+                repository = name.value,
+                tag = Some("v" + version.value))
+    )
   )
   .dependsOn(`schema`)
 
 lazy val `avro_consumer` = (project in file("avroConsumer"))
-  .enablePlugins(sbtdocker.DockerPlugin)
+  .enablePlugins(sbtdocker.DockerPlugin, DockerComposePlugin, JavaAppPackaging)
   .settings(
     scalaVersion := scalaProjectVersion,
     name := "avro_consumer",
@@ -143,7 +141,25 @@ lazy val `avro_consumer` = (project in file("avroConsumer"))
     ),
     wartremoverWarnings ++= Warts.all,
     scalafmtOnCompile := true,
-    dockerSettings(debugPort = Some(consumerDebugPort)),
-    mainClass in assembly := Some("com.kainos.consumer.AvroConsumer")
+    dockerImageCreationTask := (publishLocal in Docker).value,
+    mainClass in Compile := Some("com.kainos.consumer.AvroConsumer"),
+    dockerfile in docker := {
+      new Dockerfile {
+        val mainClassString = (mainClass in Compile).value.get
+        val classpath = (fullClasspath in Compile).value
+        from("java")
+        add(classpath.files, dockerAppPath)
+        copy(baseDirectory.value / dockerResourcesDir,
+             dockerResourcesTargetPath)
+        entryPoint(s"/app/entrypoint.sh")
+        cmd(s"${name.value}", s"${version.value}", s"$consumerDebugPort")
+      }
+    },
+    imageNames in docker := Seq(
+      ImageName(s"${name.value}:latest"),
+      ImageName(namespace = Some(organization.value),
+                repository = name.value,
+                tag = Some("v" + version.value))
+    )
   )
   .dependsOn(`schema`)

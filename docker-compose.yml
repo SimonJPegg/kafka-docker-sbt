@@ -3,13 +3,11 @@ services:
   zookeeper:
     image: confluent/zookeeper:latest
     hostname: zookeeper
-    container_name: zookeeper
     ports:
       - "2181:2181"
   kafka:
       image: confluent/kafka:latest
       hostname: kafka
-      container_name: kafka
       ports:
         - "9092:9092"
       depends_on:
@@ -26,7 +24,6 @@ services:
   schemaregistry:
       image: confluent/schema-registry
       hostname: schemaregistry
-      container_name: schemaregistry
       depends_on:
         - kafka
         - zookeeper
@@ -38,7 +35,6 @@ services:
   string_producer:
         image: string_producer
         hostname: string_producer
-        container_name: string_producer
         tty: true
         depends_on:
           - zookeeper
@@ -46,7 +42,6 @@ services:
   string_avro_converter:
           image: string_avro_converter
           hostname: string_avro_converter
-          container_name: string_avro_converter
           tty: true
           depends_on:
             - zookeeper
@@ -55,7 +50,6 @@ services:
   avro_consumer:
           image: avro_consumer
           hostname: avro_consumer
-          container_name: avro_consumer
           tty: true
           depends_on:
             - zookeeper
